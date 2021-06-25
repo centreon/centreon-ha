@@ -41,20 +41,19 @@ BACKUP_DIR="/var/backup"
 SAVE_LAST_DIR="/var/lib/centreon-backup"
 SAVE_LAST_FILE="backup.last"
 DO_ARCHIVE=1
-DB_ROOT_USER="root"
-DB_ROOT_PASSWORD=""
-INIT_SCRIPT="" # try to find it
+DB_ROOT_USER="@MYSQL_REPL_USER@"
+DB_ROOT_PASSWORD="@MYSQL_REPL_PASSWD@"
 PARTITION_NAME="centreon_storage/data_bin centreon_storage/logs"
-PACEMAKER_ON="0"
-PACEMAKER_RSC_MYSQL="ms_MySQL"
+PACEMAKER_ON="1"
+PACEMAKER_RSC_MYSQL="ms_mysql"
 MYSQL_CNF="/etc/my.cnf.d/server.cnf"
-READONLY_CHECK=0
+READONLY_CHECK=1
 
 ###
 # Check MySQL launch
 ###
 process=$(ps -o args --no-headers -C mysqld)
-started=0
+started=1
 logbin_activated=1
 
 #####
@@ -72,6 +71,11 @@ check_readonly() {
         if [ "$?" -ne "0" ] ; then
             output_log "ERROR: cannot get readonly option value" 1
 			exit 1
+        fi
+        
+        if [ "$readonly_value" -eq "0" ] ; then
+            output_log "ERROR: The database is not on read_only. Maybe you try to perform the backup on the master"
+            exit 1
         fi
     fi
 }
@@ -181,18 +185,6 @@ output_log "MySQL datadir found: $datadir"
 output_log "MySQL logbin files: $logbin_files"
 output_log "MySQL logbin localisation: $logbin_loc"
 
-if [ -e "/etc/init.d/mysql" ] ; then
-        INIT_SCRIPT="/etc/init.d/mysql"
-fi
-if [ -e "/etc/init.d/mysqld" ] ; then
-        INIT_SCRIPT="/etc/init.d/mysqld"
-fi
-if [ -z "$INIT_SCRIPT" ] ; then
-        output_log "ERROR: Can't find init MySQL script." 1
-        exit 1
-fi
-
-###
 # Get mount
 ###
 mount_device=$(df -P "$datadir" | tail -1 | awk '{ print $1 }')
@@ -361,12 +353,12 @@ echo "#####################"
 # We need to stop if need
 ###
 if [ "$PACEMAKER_ON" = "1" ] ; then
-	crm resource unmanage "$PACEMAKER_RSC_MYSQL"
+	pcs resource unmanage "$PACEMAKER_RSC_MYSQL"
 fi
 if [ "$started" -eq 1 ] ; then
 	i=0
 	output_log "Stopping mysqld:" 0 1
-	$INIT_SCRIPT stop
+	systemctl stop mariadb
 	while ps -o args --no-headers -C mysqld >/dev/null; do
 		if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
 			output_log ""
@@ -392,7 +384,7 @@ lvcreate -l $free_pe -s -n dbbackup $lv_name
 # Start server
 ###
 output_log "Start mysqld:"
-$INIT_SCRIPT start
+systemctl start mariadb
 
 set_readonly
 
@@ -400,8 +392,8 @@ set_readonly
 # Pacemaker start
 ###
 if [ "$PACEMAKER_ON" = "1" ] ; then
-	crm resource manage "$PACEMAKER_RSC_MYSQL"
-	crm resource cleanup "$PACEMAKER_RSC_MYSQL"
+	pcs resource manage "$PACEMAKER_RSC_MYSQL"
+	pcs resource cleanup "$PACEMAKER_RSC_MYSQL"
 fi
 
 ###
