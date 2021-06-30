@@ -9,6 +9,8 @@
 #
 ###################################################
 
+source /etc/centreon-ha/mysql-resources.sh
+
 OPT_TOTAL=1
 OPT_TOTALINCR=0
 OPT_INCR=0
@@ -41,8 +43,6 @@ BACKUP_DIR="/var/backup"
 SAVE_LAST_DIR="/var/lib/centreon-backup"
 SAVE_LAST_FILE="backup.last"
 DO_ARCHIVE=1
-DB_ROOT_USER="@MYSQL_REPL_USER@"
-DB_ROOT_PASSWORD="@MYSQL_REPL_PASSWD@"
 PARTITION_NAME="centreon_storage/data_bin centreon_storage/logs"
 PACEMAKER_ON="1"
 PACEMAKER_RSC_MYSQL="ms_mysql"
@@ -66,17 +66,15 @@ check_readonly() {
         return 0
     fi
     
-    if [ "$started" -eq 1 ] ; then
-        readonly_value=$(mysql -N -B -u "$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" -e 'SELECT @@global.read_only')
-        if [ "$?" -ne "0" ] ; then
-            output_log "ERROR: cannot get readonly option value" 1
-			exit 1
-        fi
-        
-        if [ "$readonly_value" -eq "0" ] ; then
-            output_log "ERROR: The database is not on read_only. Maybe you try to perform the backup on the master"
-            exit 1
-        fi
+    readonly_value=$(mysql -N -B -u "$DBROOTUSER" -p"$DBROOTPASSWORD" -e 'SELECT @@global.read_only')
+    if [ "$?" -ne "0" ] ; then
+        output_log "ERROR: cannot get readonly option value" 1
+	exit 1
+    fi
+       
+    if [ "$readonly_value" -eq "0" ] ; then
+        output_log "ERROR: The database is not on read_only. Maybe you tried to perform the backup on the master"
+        exit 1
     fi
 }
 
@@ -85,32 +83,26 @@ set_readonly() {
         return 0
     fi
     # we let the default if we don't know before
-    if [ "$started" -eq 1 ] ; then
-        mysql -N -B -u "$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" -e "SET GLOBAL read_only=$readonly_value"
-    fi
+        mysql -N -B -u "$DBROOTUSER" -p"$DBROOTPASSWORD" -e "SET GLOBAL read_only=$readonly_value"
 }
 
 get_current_logbin_file() {
 	up_logbin=$1
 
-	if [ "$started" -eq 1 ] ; then
-		if [ "$up_logbin" -eq 1 ] ; then
-			mysqladmin --user="$DB_ROOT_USER" --password="$DB_ROOT_PASSWORD" flush-logs
-		fi
-
-		if [ -z "$DB_ROOT_PASSWORD" ] ; then
-			file=$(mysql -B -u "$DB_ROOT_USER" -e 'SHOW MASTER STATUS\G' 2>&1 | grep 'File:' | awk '{ print $2 }')
-		else
-			file=$(mysql -B -u "$DB_ROOT_USER" -p"$DB_ROOT_PASSWORD" -e 'SHOW MASTER STATUS\G' 2>&1 | grep 'File:' | awk '{ print $2 }')
-		fi
-		if [ "$?" -ne "0" ] ; then
-			output_log "ERROR: connection MySQL to get index file." 1
-			exit 1
-		fi
-		echo "$file" | awk -F. '{ print $2 - 1 }'
-	else
-		cat "$datadir/mysql-bin.index" | tail -1 | awk -F. '{ print $2 }'
+	if [ "$up_logbin" -eq 1 ] ; then
+		mysqladmin --user="$DBROOTUSER" --password="$DBROOTPASSWORD" flush-logs
 	fi
+
+	if [ -z "$DBROOTPASSWORD" ] ; then
+		file=$(mysql -B -u "$DBROOTUSER" -e 'SHOW MASTER STATUS\G' 2>&1 | grep 'File:' | awk '{ print $2 }')
+	else
+		file=$(mysql -B -u "$DBROOTUSER" -p"$DBROOTPASSWORD" -e 'SHOW MASTER STATUS\G' 2>&1 | grep 'File:' | awk '{ print $2 }')
+	fi
+	if [ "$?" -ne "0" ] ; then
+		output_log "ERROR: connection MySQL to get index file." 1
+		exit 1
+	fi
+	echo "$file" | awk -F. '{ print $2 - 1 }'
 }
 
 output_log() {
@@ -136,7 +128,6 @@ if [ -n "$process" ] ; then
 	logbin=$(echo "$process" | awk '{ for (i = 1; i < NF; i++) { if (match($i, "--log-bin")) { print $i } } }' | awk -F\= '{ print $1 }')
 	logbin_path=$(echo "$process" | awk '{ for (i = 1; i < NF; i++) { if (match($i, "--log-bin")) { print $i } } }' | awk -F\= '{ print $2 }')
 	pidname=$(echo "$process" | awk '{ for (i = 1; i < NF; i++) { if (match($i, "--pid-file")) { print $i } } }' | awk -F\= '{ print $2 }')
-	started=1
     if [ -n "$etc_file" ] ; then
 		MYSQL_CNF="$etc_file"
 	fi
@@ -355,22 +346,20 @@ echo "#####################"
 if [ "$PACEMAKER_ON" = "1" ] ; then
 	pcs resource unmanage "$PACEMAKER_RSC_MYSQL"
 fi
-if [ "$started" -eq 1 ] ; then
-	i=0
-	output_log "Stopping mysqld:" 0 1
-	systemctl stop mariadb
-	while ps -o args --no-headers -C mysqld >/dev/null; do
-		if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
-			output_log ""
-			output_log "ERROR: Can't stop MySQL Server" 1
-			exit 1
-		fi
-		output_log "." 0 1
-		sleep 1
-		i=$(($i + 1))
-	done
-	output_log "OK"
-fi
+i=0
+output_log "Stopping mysqld:" 0 1
+mysqladmin --user="$DBROOTUSER" --password="$DBROOTPASSWORD"  shutdown 
+while ps -o args --no-headers -C mysqld >/dev/null; do
+	if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
+		output_log ""
+		output_log "ERROR: Can't stop MySQL Server" 1
+		exit 1
+	fi
+	output_log "." 0 1
+	sleep 1
+	i=$(($i + 1))
+done
+output_log "OK"
 
 save_timestamp=$(date '+%s')
 
