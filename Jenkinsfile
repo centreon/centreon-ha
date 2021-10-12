@@ -14,13 +14,25 @@ if (env.BRANCH_NAME.startsWith('release-')) {
 } else {
   env.BUILD = 'CI'
 }
+/*
+** Functions.
+*/
 
+def checkoutCentreonBuild() {
+  dir('centreon-build') {
+    checkout resolveScm(source: [$class: 'GitSCMSource',
+      remote: 'https://github.com/centreon/centreon-build.git',
+      credentialsId: 'technique-ci',
+      traits: [[$class: 'jenkins.plugins.git.traits.BranchDiscoveryTrait']]],
+      targets: [BRANCH_NAME, 'master'])
+  }
+}
 /*
 ** Pipeline code.
 */
 stage('Deliver sources') {
   node {
-    sh 'setup_centreon_build.sh'
+    checkoutCentreonBuild()
     dir('centreon-ha') {
       checkout scm
     }
@@ -49,7 +61,7 @@ stage('Deliver sources') {
 stage('RPM packaging') {
   parallel 'centos7': {
     node {
-      sh 'setup_centreon_build.sh'
+      checkoutCentreonBuild()
       sh "./centreon-build/jobs/ha/${serie}/ha-package.sh centos7"
       stash name: 'rpms-centos7', includes: "output/noarch/*.rpm"
       archiveArtifacts artifacts: 'rpms-centos7.tar.gz'
@@ -58,7 +70,7 @@ stage('RPM packaging') {
   },
   'centos8': {
     node {
-      sh 'setup_centreon_build.sh'
+      checkoutCentreonBuild()
       sh "./centreon-build/jobs/ha/${serie}/ha-package.sh centos8"
       stash name: 'rpms-centos8', includes: "output/noarch/*.rpm"
       archiveArtifacts artifacts: 'rpms-centos8.tar.gz'
@@ -73,7 +85,7 @@ stage('RPM packaging') {
 if ((env.BUILD == 'RELEASE') || (env.BUILD == 'CI') || (env.BUILD == 'QA') ) {
   stage('Delivery') {
     node {
-      sh 'setup_centreon_build.sh'
+      checkoutCentreonBuild()
       unstash 'rpms-centos7'
       unstash 'rpms-centos8'
       sh "./centreon-build/jobs/ha/${serie}/ha-delivery.sh"
