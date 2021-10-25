@@ -63,7 +63,7 @@ fi
 ###
 # Check MySQL launch
 ###
-process=$(ps -o args --no-headers -C \${$MYSQLBINARY})
+process=$(ps -o args --no-headers -C ${MYSQLBINARY})
 started=0
 
 ###
