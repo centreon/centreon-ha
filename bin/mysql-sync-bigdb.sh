@@ -395,7 +395,7 @@ fi
 ###
 
 echo "Start MySQL Slave"
-$USER_SUDO ssh $slave_hostname "$MYSQL_START &"
+$USER_SUDO ssh $slave_hostname -- "$MYSQL_START &"
 i=0
 until mysqlshow -u "$DBROOTUSER" -h "$slave_hostname" -p"$DBROOTPASSWORD" > /dev/null 2>&1; do
         if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
