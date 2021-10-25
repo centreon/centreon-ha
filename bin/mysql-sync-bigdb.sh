@@ -39,6 +39,7 @@ SNAPSHOT_MOUNT_PATH="/mnt/"
 MYSQL_CNF="/etc/my.cnf.d/server.cnf"
 USER="mysql"
 USER_SUDO="sudo -u $USER"
+MYSQLBINARY="mariadbd"
 MYSQLADMIN="mysqladmin"
 MYSQLBINLOG="mysqlbinlog"
 MYSQL_START="/usr/bin/mysqld_safe --defaults-file=/etc/my.cnf.d/server.cnf --pid-file=/var/lib/mysql/mysql.pid --socket=/var/lib/mysql/mysql.sock --datadir=/var/lib/mysql --log-error=/var/log/mysqld.log --user=mysql --skip-slave-start"
@@ -62,7 +63,7 @@ fi
 ###
 # Check MySQL launch
 ###
-process=$(ps -o args --no-headers -C mariadbd)
+process=$(ps -o args --no-headers -C \${$MYSQLBINARY})
 started=0
 
 ###
@@ -247,7 +248,7 @@ fi
 slave_hostname=$(get_other_db_hostname)
 master_hostname=$(get_other_db_hostname $slave_hostname)
 echo "Connection to slave Server (verify mysql stopped): $slave_hostname"
-result=$($USER_SUDO ssh $slave_hostname 'if ps --no-headers -C mariadbd >/dev/null; then echo "yes" ; else echo "no"; fi')
+result=$($USER_SUDO ssh $slave_hostname 'if ps --no-headers -C '"$MYSQLBINARY"' >/dev/null; then echo "yes" ; else echo "no"; fi')
 if [ "$result" != "no" ] ; then
 	echo "ERROR: MySQL is launched or problem to connect to the server." >&2
 	exit 1
@@ -266,9 +267,9 @@ fi
 ###
 if [ "$started" -eq 1 ] ; then
 	i=0
-	echo -n "Stopping mariadbd:"
+	echo -n "Stopping $MYSQLBINARY:"
     $MYSQLADMIN -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" shutdown
-	while ps -o args --no-headers -C mariadbd >/dev/null; do
+	while ps -o args --no-headers -C $MYSQLBINARY >/dev/null; do
 		if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
 			echo ""
 			echo "ERROR: Can't stop MySQL Server" >&2
@@ -295,7 +296,7 @@ fi
 ###
 # Start server
 ###
-echo "Start mariadbd: ($MYSQL_START)"
+echo "Start $MYSQLBINARY: ($MYSQL_START)"
 $MYSQL_START &
 i=0
 until mysqlshow -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" > /dev/null 2>&1; do
