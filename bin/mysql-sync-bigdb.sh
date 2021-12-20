@@ -42,8 +42,9 @@ USER_SUDO="sudo -u $USER"
 MYSQLBINARY="mariadbd"
 MYSQLADMIN="mysqladmin"
 MYSQLBINLOG="mysqlbinlog"
-MYSQL_START="/usr/bin/mysqld_safe --defaults-file=/etc/my.cnf.d/server.cnf --pid-file=/var/lib/mysql/mysql.pid --socket=/var/lib/mysql/mysql.sock --datadir=/var/lib/mysql --log-error=/var/log/mysqld.log --user=mysql --skip-slave-start"
+MYSQL_START="systemctl start mariadb"
 SUDO_MYSQL_START_SLAVE="sudo"
+SSH_PORT="22"
 
 if [[ "$USER" == "root" ]] ; then
     USER_SUDO=
@@ -248,39 +249,43 @@ fi
 slave_hostname=$(get_other_db_hostname)
 master_hostname=$(get_other_db_hostname $slave_hostname)
 echo "Connection to slave Server (verify mysql stopped): $slave_hostname"
-result=$($USER_SUDO ssh $slave_hostname 'if ps --no-headers -C '"$MYSQLBINARY"' >/dev/null; then echo "yes" ; else echo "no"; fi')
+result=$($USER_SUDO ssh -p $SSH_PORT $slave_hostname 'if ps --no-headers -C '"$MYSQLBINARY"' >/dev/null; then echo "yes" ; else echo "no"; fi')
 if [ "$result" != "no" ] ; then
 	echo "ERROR: MySQL is launched or problem to connect to the server." >&2
 	exit 1
+fi
+if [ "$started" -eq 0 ] ; then
+    echo "ERROR: MySQL master is not started." >&2
+    exit 1
 fi
 
 #############
 ############# END SANITY CHECK
 #############
 
-###########################################
-# Beginning
-###########################################
-
-###
-# We need to stop if need
-###
-if [ "$started" -eq 1 ] ; then
-	i=0
-	echo -n "Stopping $MYSQLBINARY:"
-    $MYSQLADMIN -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" shutdown
-	while ps -o args --no-headers -C $MYSQLBINARY >/dev/null; do
-		if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
-			echo ""
-			echo "ERROR: Can't stop MySQL Server" >&2
-			exit 1
-		fi
-		echo -n "."
-		sleep 1
-		i=$(($i + 1))
-	done
-	echo "OK"
+gtid_current_pos=$($MYSQLBINARY -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = ON; SELECT @@gtid_current_pos')
+if ! echo "$gtid_current_pos" | grep -qE '[0-9]+-[0-9]+-[0-9]+' ; then
+    $MYSQLBINARY -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = OFF;'
+    echo "ERROR: cannot get gtid current pos"
+    exit 1
 fi
+
+echo "gtid_current_pos = " $gtid_current_pos
+
+i=0
+echo -n "Stopping $MYSQLBINARY:"
+$MYSQLADMIN -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" shutdown
+while ps -o args --no-headers -C $MYSQLBINARY >/dev/null; do
+    if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
+        echo ""
+        echo "ERROR: Can't stop MySQL Server" >&2
+        exit 1
+    fi
+    echo -n "."
+    sleep 1
+    i=$(($i + 1))
+done
+echo "OK"
 
 ###
 # Do snapshot
@@ -317,31 +322,16 @@ echo "OK"
 
 echo "Mount LVM snapshot"
 SNAPSHOT_DATADIR_MOUNT="$SNAPSHOT_MOUNT_PATH/snap-dbbackupdatadir"
-SNAPSHOT_LOGBIN_MOUNT="$SNAPSHOT_DATADIR_MOUNT"
 mkdir -p "$SNAPSHOT_DATADIR_MOUNT"
 TYPEFS_BACKUP=$(df -T "$datadir" | tail -1 | awk -F' ' '{print $(NF-5)}')
 [ "$TYPEFS_BACKUP"  = "xfs" ] && MNTOPTIONS="-o nouuid"
 mount $MNTOPTIONS /dev/$vg_name/dbbackupdatadir "$SNAPSHOT_DATADIR_MOUNT"
-if [ "$lv_name_logbin" != "$lv_name" ] ; then
-	SNAPSHOT_LOGBIN_MOUNT="$SNAPSHOT_MOUNT_PATH/snap-dbbackuplogbin"
-	mkdir -p "$SNAPSHOT_LOGBIN_MOUNT"
-	mount $MNTOPTIONS /dev/$vg_name/dbbackuplogbin "$SNAPSHOT_LOGBIN_MOUNT"
-fi
 
 ###
 # Get Index path
 ###
 
 concat_datadir=$(echo "$datadir" | sed "s#^${mount_point}##")
-concat_logdir=$(echo "$logbin_loc" | sed "s#^${mount_point_logbin}##")
-last_index_file=$(cat "$SNAPSHOT_LOGBIN_MOUNT/$concat_logdir/${logbin_files}.index" | tail -1)
-last_index_file=$(basename "$last_index_file")
-#bin_log_num=$(echo "$last_index_file" | awk -F. '{ value = $NF + 1 } END { printf "%06d", value}')
-binlog_pos=$($MYSQLBINLOG "$SNAPSHOT_LOGBIN_MOUNT/$concat_logdir/$last_index_file" | tail -100 | perl -e '$last_pos=""; while (<>) { if (/^#.*?\send_log_pos\s([0-9]+)/) { $last_pos = $1; } } print $last_pos . "\n";')
-binlog_file=$(basename "$last_index_file")
-
-echo "BinLog File = " $binlog_file
-echo "BinLog Position = " $binlog_pos
 
 ###
 # Make master DB writable
@@ -355,14 +345,14 @@ mysql -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e "SET GLOB
 ###
 
 echo "Delete Logbin and RelayLog files"
-$USER_SUDO ssh $slave_hostname "rm -f \"${logbin_loc}/${logbin_files}\"* \"${relaylog_loc}/${relaylog_files}\"*"
+$USER_SUDO ssh -p $SSH_PORT $slave_hostname "rm -f \"${logbin_loc}/${logbin_files}\"* \"${relaylog_loc}/${relaylog_files}\"*"
 
 ###
 # Rsync
 ###
 
 echo "Rsync in progress (exclude MySQL, ${logbin_files}, ${relaylog_files})"
-rsync -av --delete --progress --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude="auto.cnf" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh" $slave_hostname:$datadir/
+rsync -av --delete --progress --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude="auto.cnf" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh -p $SSH_PORT" $slave_hostname:$datadir/
 
 mysql_ibd_system=''
 for file in $(ls "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/"*.ibd); do
@@ -370,12 +360,12 @@ for file in $(ls "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/"*.ibd); do
     mysql_ibd_system="$mysql_ibd_system \"$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/$filename.ibd\" \"$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/$filename.frm\""
 done
 if [ -n "$mysql_ibd_system" ] ; then
-    eval rsync -av --progress $mysql_ibd_system -e \"\$USER_SUDO ssh\" \$slave_hostname:\"\$datadir/mysql/\"
+    eval rsync -av --progress $mysql_ibd_system -e \"\$USER_SUDO ssh -p $SSH_PORT\" \$slave_hostname:\"\$datadir/mysql/\"
 fi
 
 # Mode Fastest. Uncomment this and comment line above
-#rsync -av --delete --progress --exclude="*.MYI" --exclude="*.MYD" --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh" $slave_hostname:$datadir/
-#rsync -av --size-only --delete --progress --include='*/' --exclude="mysql" --include='*.MYI' --include='*.MYD' --exclude='*' --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "ssh -i /var/lib/mysql/.ssh/id_rsa" $USER@$slave_hostname:$datadir/
+#rsync -av --delete --progress --exclude="*.MYI" --exclude="*.MYD" --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh -p $SSH_PORT" $slave_hostname:$datadir/
+#rsync -av --size-only --delete --progress --include='*/' --exclude="mysql" --include='*.MYI' --include='*.MYD' --exclude='*' --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "ssh -i /var/lib/mysql/.ssh/id_rsa -p $SSH_PORT" $USER@$slave_hostname:$datadir/
 
 ###
 # Suppression du snapshot
@@ -384,18 +374,13 @@ fi
 echo "Umount and Delete LVM snapshot"
 umount "$SNAPSHOT_DATADIR_MOUNT"
 lvremove -f /dev/$vg_name/dbbackupdatadir
-if [ "$lv_name_logbin" != "$lv_name" ] ; then
-	umount "$SNAPSHOT_LOGBIN_MOUNT"
-	lvremove -f /dev/$vg_name/dbbackuplogbin
-fi
-
 
 ###
 # Demarrer le serveur slave
 ###
 
 echo "Start MySQL Slave"
-$USER_SUDO ssh $slave_hostname -- "$MYSQL_START &"
+$USER_SUDO ssh -p $SSH_PORT $slave_hostname -- "$MYSQL_START &"
 i=0
 until mysqlshow -u "$DBROOTUSER" -h "$slave_hostname" -p"$DBROOTPASSWORD" > /dev/null 2>&1; do
         if [ "$i" -gt "$STOP_TIMEOUT" ] ; then
@@ -417,7 +402,8 @@ mysql -f -u "$DBROOTUSER" -h "$slave_hostname" -p"$DBROOTPASSWORD" << EOF
 RESET MASTER;
 STOP SLAVE;
 RESET SLAVE;
-CHANGE MASTER TO MASTER_HOST='$master_hostname', MASTER_USER='$DBREPLUSER', MASTER_PASSWORD='$DBREPLPASSWORD', MASTER_LOG_FILE='$binlog_file', MASTER_LOG_POS=$binlog_pos;
+SET GLOBAL gtid_slave_pos = '$gtid_current_pos';
+CHANGE MASTER TO MASTER_HOST='$master_hostname', MASTER_USER='$DBREPLUSER', MASTER_PASSWORD='$DBREPLPASSWORD', master_use_gtid=slave_pos;
 START SLAVE;
 show processlist;
 quit
