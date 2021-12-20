@@ -230,9 +230,9 @@ fi
 ############# END SANITY CHECK
 #############
 
-gtid_current_pos=$($MYSQLBINARY -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = ON; SELECT @@gtid_current_pos')
+gtid_current_pos=$(mysql -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = ON; SELECT @@gtid_current_pos')
 if ! echo "$gtid_current_pos" | grep -qE '[0-9]+-[0-9]+-[0-9]+' ; then
-    $MYSQLBINARY -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = OFF;'
+    mysql -B -N -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e 'SET GLOBAL read_only = OFF;'
     echo "ERROR: cannot get gtid current pos"
     exit 1
 fi
