@@ -36,7 +36,6 @@ cmd_line $*
 VG_FREESIZE_NEEDED=1
 STOP_TIMEOUT=60
 SNAPSHOT_MOUNT_PATH="/mnt/"
-MYSQL_CNF="/etc/my.cnf.d/server.cnf"
 USER="mysql"
 USER_SUDO="sudo -u $USER"
 MYSQLBINARY="mariadbd"
@@ -79,13 +78,17 @@ if [ -n "$process" ] ; then
     relaylog=$(echo "$process" | awk '{ for (i = 1; i < NF; i++) { if (match($i, "--relay-log")) { print $i } } }' | awk -F\= '{ print $1 }')
     relaylog_path=$(echo "$process" | awk '{ for (i = 1; i < NF; i++) { if (match($i, "--relay-log")) { print $i } } }' | awk -F\= '{ print $2 }')
     started=1
-	if [ -n "$etc_file" ] ; then
-        MYSQL_CNF="$etc_file"
-    fi
 fi
 
+if [ -n "$etc_file" ] ; then
+    mariadbd_options=$($MYSQLBINARY --print-defaults --defaults-file="$etc_file")
+else
+    mariadbd_options=$($MYSQLBINARY --print-defaults)
+fi
+mariadbd_options=$(cat $mariadbd_options | awk '{ for (i = 1; i < NF; i++) { print $i } }')
+
 if [ -z "$datadir" ] ; then
-    datadir=$(cat $MYSQL_CNF | grep -E '^datadir' | awk -F\= '{ print $2; exit 0 }')
+    datadir=$(echo $mariadbd_options | grep -E '^--datadir=' | awk -F\= '{ print $2; exit 0 }')
 fi
 
 if [ -z "$datadir" ] ; then
@@ -96,7 +99,7 @@ fi
 datadir=$(cd "$datadir"; pwd -P)
 
 if [ -z "$pidname" ] ; then
-    pidname=$(cat "$MYSQL_CNF" | grep -E '^pid-file' | awk -F\= '{ print $2; exit 0 }')
+    pidname=$(echo $mariadbd_options | grep -E '^--pid-file=' | awk -F\= '{ print $2; exit 0 }')
 fi
 if [ -z "$pidname" ] ; then
     pidname=$(hostname | cut -d '.' -f 1)
@@ -105,8 +108,8 @@ else
 fi
 
 if [ -z "$logbin" ] ; then
-    logbin=$(cat "$MYSQL_CNF" | grep -E '^log-bin' | awk -F\= '{ print $1 }')
-    logbin_path=$(cat "$MYSQL_CNF" | grep -E '^log-bin' | awk -F\= '{ print $2 }')
+    logbin=$(echo $mariadbd_options | grep -E '^--log-bin=' | awk -F\= '{ print $1 }')
+    logbin_path=$(echo $mariadbd_options | grep -E '^--log-bin=' | awk -F\= '{ print $2 }')
 fi
 if [ -z "$logbin" ] ; then
     echo "'log-bin' option not found. Can't sync."
@@ -124,8 +127,8 @@ else
 fi
 
 if [ -z "$relaylog" ] ; then
-    relaylog=$(cat "$MYSQL_CNF" | grep -E '^relay-log' | awk -F\= '{ print $1 }')
-    relaylog_path=$(cat "$MYSQL_CNF" | grep -E '^relay-log' | awk -F\= '{ print $2 }')
+    relaylog=$(echo $mariadbd_options | grep -E '^--relay-log=' | awk -F\= '{ print $1 }')
+    relaylog_path=$(echo $mariadbd_options | grep -E '^--relay-log=' | awk -F\= '{ print $2 }')
 fi
 if [ -z "$relaylog" ] ; then
     relaylog_loc="$datadir"
@@ -147,10 +150,6 @@ echo "MySQL logbin files: $logbin_files"
 echo "MySQL logbin localisation: $logbin_loc"
 echo "MySQL relaylog files: $relaylog_files"
 echo "MySQL relaylog localisation: $relaylog_loc"
-
-###
-# Find init script
-###
 
 ###
 # Get mount datadir
