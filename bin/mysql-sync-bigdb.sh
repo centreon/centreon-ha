@@ -85,10 +85,10 @@ if [ -n "$etc_file" ] ; then
 else
     mariadbd_options=$($MYSQLBINARY --print-defaults)
 fi
-mariadbd_options=$(cat $mariadbd_options | awk '{ for (i = 1; i < NF; i++) { print $i } }')
+mariadbd_options=$(echo $mariadbd_options | awk '{ for (i = 1; i < NF; i++) { print $i } }')
 
 if [ -z "$datadir" ] ; then
-    datadir=$(echo $mariadbd_options | grep -E '^--datadir=' | awk -F\= '{ print $2; exit 0 }')
+    datadir=$(echo -n "$mariadbd_options" | grep -E '^--datadir=' | awk -F\= '{ print $2; exit 0 }')
 fi
 
 if [ -z "$datadir" ] ; then
@@ -99,7 +99,7 @@ fi
 datadir=$(cd "$datadir"; pwd -P)
 
 if [ -z "$pidname" ] ; then
-    pidname=$(echo $mariadbd_options | grep -E '^--pid-file=' | awk -F\= '{ print $2; exit 0 }')
+    pidname=$(echo -n "$mariadbd_options" | grep -E '^--pid-file=' | awk -F\= '{ print $2; exit 0 }')
 fi
 if [ -z "$pidname" ] ; then
     pidname=$(hostname | cut -d '.' -f 1)
@@ -108,8 +108,8 @@ else
 fi
 
 if [ -z "$logbin" ] ; then
-    logbin=$(echo $mariadbd_options | grep -E '^--log-bin=' | awk -F\= '{ print $1 }')
-    logbin_path=$(echo $mariadbd_options | grep -E '^--log-bin=' | awk -F\= '{ print $2 }')
+    logbin=$(echo -n "$mariadbd_options" | grep -E '^--log-bin=' | awk -F\= '{ print $1 }')
+    logbin_path=$(echo -n "$mariadbd_options" | grep -E '^--log-bin=' | awk -F\= '{ print $2 }')
 fi
 if [ -z "$logbin" ] ; then
     echo "'log-bin' option not found. Can't sync."
@@ -127,8 +127,8 @@ else
 fi
 
 if [ -z "$relaylog" ] ; then
-    relaylog=$(echo $mariadbd_options | grep -E '^--relay-log=' | awk -F\= '{ print $1 }')
-    relaylog_path=$(echo $mariadbd_options | grep -E '^--relay-log=' | awk -F\= '{ print $2 }')
+    relaylog=$(echo -n "$mariadbd_options" | grep -E '^--relay-log=' | awk -F\= '{ print $1 }')
+    relaylog_path=$(echo -n "$mariadbd_options" | grep -E '^--relay-log=' | awk -F\= '{ print $2 }')
 fi
 if [ -z "$relaylog" ] ; then
     relaylog_loc="$datadir"
