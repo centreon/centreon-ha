@@ -41,10 +41,10 @@ USER="mysql"
 USER_SUDO="sudo -u $USER"
 MYSQLBINARY="mariadbd"
 MYSQLADMIN="mysqladmin"
-MYSQLBINLOG="mysqlbinlog"
 MYSQL_START="systemctl start mariadb"
 SUDO_MYSQL_START_SLAVE="sudo"
 SSH_PORT="22"
+RSYNC_EXTRA_OPTIONS="--checksum"
 
 if [[ "$USER" == "root" ]] ; then
     USER_SUDO=
@@ -284,6 +284,13 @@ done
 echo "OK"
 
 ###
+# Make master DB writable
+###
+
+echo "Remove read_only on master"
+mysql -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e "SET GLOBAL read_only=off"
+
+###
 # Mount snapshot
 ###
 
@@ -294,18 +301,7 @@ TYPEFS_BACKUP=$(df -T "$datadir" | tail -1 | awk -F' ' '{print $(NF-5)}')
 [ "$TYPEFS_BACKUP"  = "xfs" ] && MNTOPTIONS="-o nouuid"
 mount $MNTOPTIONS /dev/$vg_name/dbbackupdatadir "$SNAPSHOT_DATADIR_MOUNT"
 
-###
-# Get Index path
-###
-
 concat_datadir=$(echo "$datadir" | sed "s#^${mount_point}##")
-
-###
-# Make master DB writable
-###
-
-echo "Remove read_only on master"
-mysql -f -u "$DBROOTUSER" -h "$master_hostname" -p"$DBROOTPASSWORD" -e "SET GLOBAL read_only=off"
 
 ###
 # Delete from other side
@@ -319,7 +315,7 @@ $USER_SUDO ssh -p $SSH_PORT $slave_hostname "rm -f \"${logbin_loc}/${logbin_file
 ###
 
 echo "Rsync in progress (exclude MySQL, ${logbin_files}, ${relaylog_files})"
-rsync -av --delete --progress --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude="auto.cnf" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh -p $SSH_PORT" $slave_hostname:$datadir/
+rsync -av $RSYNC_EXTRA_OPTIONS --delete --progress --exclude="mysql" --exclude="${pidname}.pid" --exclude="${logbin_files}*" --exclude="${relaylog_files}*" --exclude="auto.cnf" --exclude=".ssh/*" "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/" -e "$USER_SUDO ssh -p $SSH_PORT" $slave_hostname:$datadir/
 
 mysql_ibd_system=''
 for file in $(ls "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/"*.ibd); do
@@ -327,7 +323,7 @@ for file in $(ls "$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/"*.ibd); do
     mysql_ibd_system="$mysql_ibd_system \"$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/$filename.ibd\" \"$SNAPSHOT_DATADIR_MOUNT/$concat_datadir/mysql/$filename.frm\""
 done
 if [ -n "$mysql_ibd_system" ] ; then
-    eval rsync -av --progress $mysql_ibd_system -e \"\$USER_SUDO ssh -p $SSH_PORT\" \$slave_hostname:\"\$datadir/mysql/\"
+    eval rsync -av $RSYNC_EXTRA_OPTIONS --progress $mysql_ibd_system -e \"\$USER_SUDO ssh -p $SSH_PORT\" \$slave_hostname:\"\$datadir/mysql/\"
 fi
 
 # Mode Fastest. Uncomment this and comment line above
