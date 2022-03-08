@@ -57,7 +57,7 @@ stage('RPM packaging') {
       archiveArtifacts artifacts: 'rpms-centos7.tar.gz'
       sh 'rm -rf output'
     }
-  }
+  },
   'alma8': {
     node {
       sh 'setup_centreon_build.sh'
