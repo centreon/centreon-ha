@@ -1,0 +1,5 @@
+etc/centreon-ha/*                   etc/centreon-ha
+etc/sudoers.d/centreon-cluster-db   etc/sudoers.d
+ocf-scripts/mysql-centreon          usr/lib/ocf/resource.d/heartbeat
+bin/*                               usr/share/centreon-ha/bin
+lib/mysql-functions.sh              usr/share/centreon-ha/lib
