@@ -32,5 +32,6 @@ Depends:
   ${misc:Depends}, 
   ${shlibs:Depends},
   perl:native,
+  resources-agents,
   centreon-ha (>=21.10.0),
   centreon-web (>=21.10.0)
