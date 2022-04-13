@@ -17,12 +17,11 @@ Description:
 Depends:
   ${misc:Depends}, 
   ${shlibs:Depends},
-  perl:native,
   rsync,
   libcommon-sense-perl,
   liblinux-inotify2-perl,
-  centreon-common (>=21.10.0),
-  centreon-gorgone (>=21.10.0)
+  centreon-common (>= 21.10.0~),
+  centreon-gorgone (>= 21.10.0~)
 
 
 Package: centreon-ha-web
@@ -31,7 +30,6 @@ Description: This add-on is built to manage a failover solution for Centreon.
 Depends:
   ${misc:Depends}, 
   ${shlibs:Depends},
-  perl:native,
   resources-agents,
-  centreon-ha (>=21.10.0),
-  centreon-web (>=21.10.0)
+  centreon-ha (>= 21.10.0~),
+  centreon-web (>= 21.10.0~)
