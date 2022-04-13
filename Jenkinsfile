@@ -82,7 +82,7 @@ stage('RPM/DEB packaging') {
   },
   'Debian bullseye packaging and signing': {
       node {
-        dir('centreon-ha) {
+        dir('centreon-ha') {
           checkout scm
         }
         sh 'docker run -i --entrypoint "/src/centreon-ha/ci/scripts/centreom-ha-package.sh" -w "/src" -v "$PWD:/src" -e "DISTRIB=Debian11" -e "VERSION=$VERSION" -e "RELEASE=$RELEASE" registry.centreon.com/centreon-debian11-dependencies:22.04'
