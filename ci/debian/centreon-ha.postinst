@@ -2,8 +2,10 @@
 
 if [ "$1" = "configure" ] ; then
 
-  # reload systemd services configuration
-  systemctl daemon-reload
-  
+  if [ "$(getent passwd centreon)" ]; then
+    chown -vR centreon:centreon /var/log/centreon-ha
+    chmod -vR 0755 /var/log/centreon-ha
+  fi
+
 fi
 exit 0
