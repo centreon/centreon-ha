@@ -125,7 +125,7 @@ if ((env.BUILD == 'RELEASE') || (env.BUILD == 'CI') || (env.BUILD == 'QA') ) {
     node {
       sh 'setup_centreon_build.sh'
       unstash 'rpms-centos7'
-      //unstash 'rpms-centos8'
+      unstash 'rpms-alma8'
       sh "./centreon-build/jobs/ha/${serie}/ha-delivery.sh"
     }
     if ((currentBuild.result ?: 'SUCCESS') != 'SUCCESS') {
