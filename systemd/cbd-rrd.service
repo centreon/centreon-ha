@@ -20,7 +20,7 @@
 Description=Centreon RRD Broker service
 
 [Service]
-EnvironmentFile=/etc/default/cbd_rrd
+EnvironmentFile=/etc/sysconfig/cbd_sql
 ExecStart=/usr/sbin/cbd $OPTIONS
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
