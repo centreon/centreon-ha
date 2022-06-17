@@ -3,4 +3,4 @@ etc/centreon-ha/centreon_central_sync.pm    etc/centreon-ha
 etc/sudoers.d/centreon-cluster              etc/sudoers.d
 etc/default/*                               etc/default
 systemd/*                                   lib/systemd/system
-sed -i 's#etc/sysconfig#etc/defaul#g' systemd/*.service
+sed -i 's#/etc/sysconfig#/etc/default#g' /lib/systemd/system/*.service
