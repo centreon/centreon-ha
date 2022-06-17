@@ -20,7 +20,7 @@
 Description=Centreon SQL Broker service
 
 [Service]
-EnvironmentFile=//etc/default/cbd_sql
+EnvironmentFile=/etc/sysconfig/cbd_sql
 ExecStart=/usr/sbin/cbd $OPTIONS
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
