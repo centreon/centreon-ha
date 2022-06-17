@@ -8,4 +8,5 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 override_dh_gencontrol:
 	dh_gencontrol -- -Tdebian/substvars
 	
-sed -i 's#/etc/sysconfig#/etc/default#g' /lib/systemd/system/*.service
+override_dh_auto_build:
+        sed -i 's#/etc/sysconfig#/etc/default#g' systemd/*.service
