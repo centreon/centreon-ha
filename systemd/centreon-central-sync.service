@@ -20,7 +20,7 @@
 Description=Centreon Central Sync (failover only)
 
 [Service]
-EnvironmentFile=/etc/default/centreon_central_sync
+EnvironmentFile=/etc/sysconfig/centreon_central_sync
 ExecStart=/usr/share/centreon-ha/bin/centreon_central_sync $OPTIONS
 ExecReload=/bin/kill -HUP $MAINPID
 Type=simple
