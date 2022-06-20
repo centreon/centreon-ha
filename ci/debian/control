@@ -9,7 +9,7 @@ Build-Depends:
 Standards-Version: 4.5.0
 Homepage: https://wwww.centreon.com
 
-Package: centreon-ha-common
+Package: centreon-ha
 Architecture: any
 Description:
   This package provides the scripts and config files necessary 
