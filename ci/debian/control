@@ -1,4 +1,4 @@
-Source: centreon-ha
+Source: centreon-ha-common
 Section: net
 Priority: optional
 Maintainer: Luiz Costa <me@luizgustavo.pro.br>
