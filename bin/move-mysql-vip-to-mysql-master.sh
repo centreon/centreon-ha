@@ -78,7 +78,7 @@ if [[ "$VIP_USED" ]] ; then
     # Unmount the VIP on the current VIP holder 
     if [[ "$SLAVE_DB" == "$(hostname)" ]] ; then
         [[ "$DEBUG" ]] && echo "Local ifdown"
-        sudo nmcli con mod "${MYSQL_VIP_IFNAME}" -ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli connection up "${MYSQL_VIP_IFNAME}"
+        sudo nmcli con mod "${MYSQL_VIP_IFNAME}" -ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"
     else
         # If not, we run it via SSH
         [[ "$DEBUG" ]] && echo "Remote ifdown"
@@ -91,8 +91,7 @@ fi
 # If the master is the local host, we run it locally
 if [[ "$MASTER_DB" == "$(hostname)" ]] ; then
     [[ "$DEBUG" ]] && echo "Local ifup"
-    sudo nmcli con mod "${MYSQL_VIP_IFNAME}" +ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}"
-    sudo nmcli connection up "${MYSQL_VIP_IFNAME}"
+    sudo nmcli con mod "${MYSQL_VIP_IFNAME}" +ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"
 else
     # If not, we run it via SSH
     [[ "$DEBUG" ]] && echo "Remote ifup"
