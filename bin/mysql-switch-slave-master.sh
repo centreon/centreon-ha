@@ -111,7 +111,7 @@ EOF
             echo "Not finished smoothly.!!!"
             break
         fi
-        mysql -f -u "$DBROOTUSER" -h "$NEW_MASTER" "-p$DBROOTPASSWORD" -e 'SHOW SLAVE STATUS\G' | grep -qi 'Has read all relay log; waiting for the slave I/O thread to update it'
+        mysql -f -u "$DBROOTUSER" -h "$NEW_MASTER" "-p$DBROOTPASSWORD" -e 'SHOW SLAVE STATUS\G' | grep -qi 'has read all relay log'
         if (( $?  == 0 )) ; then
             break
         else
