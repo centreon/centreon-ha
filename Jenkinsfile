@@ -1,7 +1,7 @@
 /*
 ** Variables.
 */
-def serie = '22.10'
+def serie = '22.04'
 def maintenanceBranch = "${serie}.x"
 def qaBranch = "dev-${serie}.x"
 
@@ -109,7 +109,7 @@ if ((env.BUILD == 'RELEASE') || (env.BUILD == 'CI') || (env.BUILD == 'QA') ) {
         unstash "Debian11"
         sh '''for i in $(echo *.deb)
               do 
-                curl -u $NEXUS_USERNAME:$NEXUS_PASSWORD -H "Content-Type: multipart/form-data" --data-binary "@./$i" https://apt.centreon.com/repository/22.10-$REPO/
+                curl -u $NEXUS_USERNAME:$NEXUS_PASSWORD -H "Content-Type: multipart/form-data" --data-binary "@./$i" https://apt.centreon.com/repository/22.04-$REPO/
               done
            '''    
       }
