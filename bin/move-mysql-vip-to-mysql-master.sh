@@ -82,7 +82,7 @@ if [[ "$VIP_USED" ]] ; then
     else
         # If not, we run it via SSH
         [[ "$DEBUG" ]] && echo "Remote ifdown"
-        sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SLAVE_DB} -- 'sudo nmcli con mod "${MYSQL_VIP_IFNAME}" -ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"'
+        sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SLAVE_DB} -- "sudo nmcli con mod ${MYSQL_VIP_IFNAME} -ipv4.addresses ${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK} && sudo nmcli con up ${MYSQL_VIP_IFNAME}"
     fi
 fi
 
@@ -95,7 +95,7 @@ if [[ "$MASTER_DB" == "$(hostname)" ]] ; then
 else
     # If not, we run it via SSH
     [[ "$DEBUG" ]] && echo "Remote ifup"
-    sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${MASTER_DB} -- 'sudo nmcli con mod "${MYSQL_VIP_IFNAME}" +ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"'
+    sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${MASTER_DB} -- "sudo nmcli con mod ${MYSQL_VIP_IFNAME} +ipv4.addresses ${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK} && sudo nmcli con up ${MYSQL_VIP_IFNAME}"
 fi
 
 # Send gratuitous ARP from the new VIP holder
