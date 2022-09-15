@@ -39,15 +39,15 @@ display_result_one()
 
 display_result()
 {
-	if [ $slave_address == $DBHOSTNAMEMASTER ];then
-		display_result_one $connexion_status_server2 "Connection MASTER Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
-		display_result_one $connexion_status_server1 "Connection SLAVE Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
-	elif [ $slave_address == $DBHOSTNAMESLAVE ];then
-		display_result_one $connexion_status_server1 "Connection MASTER Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
-		display_result_one $connexion_status_server2 "Connection SLAVE Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
+	if [[ "$slave_address" == "$DBHOSTNAMEMASTER" ]] ; then
+		display_result_one "$connexion_status_server2" "Connection MASTER Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
+		display_result_one "$connexion_status_server1" "Connection SLAVE Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
+	elif [[ "$slave_address" == "$DBHOSTNAMESLAVE" ]] ; then
+		display_result_one "$connexion_status_server1" "Connection MASTER Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
+		display_result_one "$connexion_status_server2" "Connection SLAVE Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
 	else
-		display_result_one $connexion_status_server1 "Connection SLAVE Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
-		display_result_one $connexion_status_server2 "Connection SLAVE Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
+		display_result_one "$connexion_status_server1" "Connection SLAVE Status '$DBHOSTNAMEMASTER'" "$report_connexion1"
+		display_result_one "$connexion_status_server2" "Connection SLAVE Status '$DBHOSTNAMESLAVE'" "$report_connexion2"
 	fi
 	display_result_one $slave_status "Slave Thread Status" "$slave_status_error"
 	display_result_one $position_status "Position Status" "$position_status_error"
