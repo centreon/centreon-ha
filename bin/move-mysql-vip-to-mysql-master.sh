@@ -78,11 +78,11 @@ if [[ "$VIP_USED" ]] ; then
     # Unmount the VIP on the current VIP holder 
     if [[ "$SLAVE_DB" == "$(hostname)" ]] ; then
         [[ "$DEBUG" ]] && echo "Local ifdown"
-        ifdown "${MYSQL_VIP_IFNAME}:1"
+        sudo nmcli con mod "${MYSQL_VIP_IFNAME}" -ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"
     else
         # If not, we run it via SSH
         [[ "$DEBUG" ]] && echo "Remote ifdown"
-        sudo -u mysql ssh "$SLAVE_DB" -- sudo ifdown "${MYSQL_VIP_IFNAME}:1"
+        sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${SLAVE_DB} -- "sudo nmcli con mod ${MYSQL_VIP_IFNAME} -ipv4.addresses ${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK} && sudo nmcli con up ${MYSQL_VIP_IFNAME}"
     fi
 fi
 
@@ -91,14 +91,12 @@ fi
 # If the master is the local host, we run it locally
 if [[ "$MASTER_DB" == "$(hostname)" ]] ; then
     [[ "$DEBUG" ]] && echo "Local ifup"
-    ifup "${MYSQL_VIP_IFNAME}:1"
+    sudo nmcli con mod "${MYSQL_VIP_IFNAME}" +ipv4.addresses "${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK}" && sudo nmcli con up "${MYSQL_VIP_IFNAME}"
 else
     # If not, we run it via SSH
     [[ "$DEBUG" ]] && echo "Remote ifup"
-    sudo -u mysql ssh "$MASTER_DB" -- sudo ifup "${MYSQL_VIP_IFNAME}:1"
+    sudo -u mysql ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${MASTER_DB} -- "sudo nmcli con mod ${MYSQL_VIP_IFNAME} +ipv4.addresses ${MYSQL_VIP_IPADDR}/${MYSQL_VIP_CIDR_NETMASK} && sudo nmcli con up ${MYSQL_VIP_IFNAME}"
 fi
-
 
 # Send gratuitous ARP from the new VIP holder
 #arping -q -c 2 -w 3 -D -I $iface $ipaddr
-

@@ -54,11 +54,11 @@ if [[ "$VIP_USED" == 1 ]] ; then
         fi
         echo "Unmounting VIP on ${CURRENT_MASTER_HOSTNAME}..."
         [[ "$DEBUG" ]] && set -x
-        VIP_SHUTDOWN_OUTPUT=$(sudo -u centreon ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${CURRENT_MASTER_HOSTNAME} -- sudo ifdown "${CENTRAL_VIP_IFNAME}\:1" 2>&1)
+        VIP_SHUTDOWN_OUTPUT=$(sudo -u centreon ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${CURRENT_MASTER_HOSTNAME} -- "sudo nmcli con mod ${CENTRAL_VIP_IFNAME} -ipv4.addresses ${CENTRAL_VIP_IPADDR}/${CENTRAL_VIP_CIDR_NETMASK} && sudo nmcli con up ${CENTRAL_VIP_IFNAME}" 2>&1)
         VIP_SHUTDOWN_RC=$?
         [[ "$DEBUG" ]] && set +x
         if [[ "$VIP_SHUTDOWN_RC" != 0 ]] ; then
-            echo "*** An error occured while removing the VIP from ."
+            echo "*** An error occured while removing the VIP from ${CURRENT_MASTER_HOSTNAME}."
             echo "$VIP_SHUTDOWN_OUTPUT" 
             exit 1
         fi
@@ -74,11 +74,11 @@ fi
 # First mount the VIP
 echo "Adding vip to ${NEW_MASTER_IPADDR}..."
 [[ "$DEBUG" ]] && set -x
-VIP_START_OUTPUT=$(sudo -u centreon ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${NEW_MASTER_IPADDR} -- sudo ifup "${CENTRAL_VIP_IFNAME}:1" 2>&1)
+VIP_START_OUTPUT=$(sudo -u centreon ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${NEW_MASTER_IPADDR} -- "sudo nmcli con mod ${CENTRAL_VIP_IFNAME} +ipv4.addresses ${CENTRAL_VIP_IPADDR}/${CENTRAL_VIP_CIDR_NETMASK} && sudo nmcli con up ${CENTRAL_VIP_IFNAME}" 2>&1)
 VIP_START_RC=$?
 [[ "$DEBUG" ]] && set +x
 if [[ "$VIP_START_RC" != 0 ]] ; then
-    echo "*** An error occured while adding the VIP."
+    echo "*** An error occured while adding the VIP to ${NEW_MASTER_IPADDR}."
     echo "$VIP_START_OUTPUT"
     exit 1
 fi
@@ -90,7 +90,7 @@ SERVICES_START_OUTPUT=$(sudo -u centreon ssh -o StrictHostKeyChecking=no -o User
 SERVICES_START_RC=$?
 [[ "$DEBUG" ]] && set +x
 if [[ "$SERVICES_START_RC" != 0 ]] ; then
-    echo "*** An error occured while starting centreon.service."
+    echo "*** An error occured while starting centreon.service on ${NEW_MASTER_IPADDR}."
     echo "$SERVICES_START_OUTPUT"
     exit 1
 fi
