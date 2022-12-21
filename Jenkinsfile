@@ -36,15 +36,6 @@ stage('Deliver sources') {
       reportName: 'Centreon HA Build Artifacts',
       reportTitles: ''
     ])
-    withSonarQubeEnv('SonarQubeDev') {
-      sh "./centreon-build/jobs/ha/${serie}/ha-analysis.sh"
-    }
-    timeout(time: 10, unit: 'MINUTES') {
-      def qualityGate = waitForQualityGate()
-      if (qualityGate.status != 'OK') {
-        currentBuild.result = 'FAIL'
-      }
-    }
   }
 }
 
